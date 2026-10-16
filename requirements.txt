@@ -1,0 +1,5 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.5
+# production model client (optional; the demo runs on a built-in fake model):
+# litellm>=1.50

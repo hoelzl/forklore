@@ -1,0 +1,16 @@
+[project]
+name = "forklore"
+version = "0.1.0"
+description = "Branching, version-controlled collaborative storytelling with LLMs"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
