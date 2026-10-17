@@ -52,6 +52,14 @@ one-shot guidance:
 `ctx.record_prompt(...)` is called with the exact messages, per the
 reproducibility contract.
 
+**Steering read-path (amendment, 2026-10-17):** prompt assembly first
+calls `ctx.steering()` (see
+`2026-10-17-steering-and-world-state-design.md`) and prepends any
+resolved steering briefs as `director` messages before the
+choice/guidance message. When no steering node exists the accessor
+returns an empty list and the strategy behaves exactly as originally
+specified. Planning world-state nodes is *not* part of crossroads v1.
+
 **Structured output:** the model replies in a small delimited format
 (`PASSAGE:` / `CHOICES:` sections). The strategy parses the reply, plans
 the story node with
@@ -72,8 +80,9 @@ including `DemoModel`.
   story* (it never becomes a node, so `materialize()` never returns it),
   not from the log — that is what keeps `context_hash` honest.
 - Guidance is **one-shot per turn**: it applies to the next generation
-  only, is recorded in that node's params, and clears after use. No
-  persistent steering state.
+  only, is recorded in that node's params, and clears after use.
+  Persistent steering is a separate, complementary feature covered by
+  the steering/world-state spec (see the amendment above).
 
 **Demo model:** `DemoModel` gains a choices-capable reply cycle
 (`PASSAGE:` / `CHOICES:` formatted text) so the whole loop works fully
@@ -183,7 +192,9 @@ Following existing conventions:
 
 ## Explicitly out of scope
 
-- Persistent/accumulating story steering (one-shot guidance only).
+- Persistent story steering and world state — covered by the companion
+  spec `2026-10-17-steering-and-world-state-design.md`; crossroads ships
+  with the steering read-path only (see the amendment above).
 - Pre-generating full continuations for each choice (choices are labels).
 - Typed core schema events for choices or media.
 - Editing/regenerating images for historical nodes (Revise keeps the
