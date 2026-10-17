@@ -29,6 +29,7 @@ from core.state import Node, TreeState
 
 from .context import StoreBranchContext
 from .registry import StrategyRegistry
+from .settings import SettingsStore, build_model
 
 
 # ---------------------------------------------------------------------------
@@ -45,7 +46,7 @@ def node_dict(n: Node) -> dict[str, Any]:
         "created_seq": n.created_seq, "version": n.version,
         "content": n.content, "versions": list(n.versions),
         "tombstoned": n.tombstoned, "meta": n.meta, "children": n.children,
-        "last_revise_seq": n.last_revise_seq,
+        "last_revise_seq": n.last_revise_seq, "tx": n.tx,
         "generation": n.generation.model_dump() if n.generation else None,
     }
 
@@ -103,12 +104,19 @@ class GenerateReq(BaseModel):
     params: dict[str, Any] = {}
 
 
+class BranchReq(BaseModel):
+    name: str
+    node: str
+
+
 # ---------------------------------------------------------------------------
 # app
 # ---------------------------------------------------------------------------
 
-def create_app(store: EventStore, registry: StrategyRegistry) -> FastAPI:
+def create_app(store: EventStore, registry: StrategyRegistry,
+               settings: SettingsStore | None = None) -> FastAPI:
     app = FastAPI(title="forklore")
+    settings = settings or SettingsStore()
 
     def guard(fn):
         try:
@@ -169,6 +177,64 @@ def create_app(store: EventStore, registry: StrategyRegistry) -> FastAPI:
     def undo(tx: str):
         return [event_dict(e) for e in guard(lambda: store.undo(tx))]
 
+    # -- branches (named storylines, via SetMeta -- no schema change) --------
+
+    def find_branch(s: TreeState, name: str) -> Node | None:
+        return next((n for n in s.nodes.values()
+                     if n.meta.get("branch") == name), None)
+
+    @app.get("/branches")
+    def list_branches():
+        s = store.state()
+        return sorted(
+            ({"name": n.meta["branch"], "node": n.id,
+              "created_seq": n.created_seq,
+              "depth": len(s.path_to_root(n.id)),
+              "hidden": s.is_hidden(n.id)}
+             for n in s.nodes.values() if n.meta.get("branch")),
+            key=lambda b: b["created_seq"])
+
+    @app.post("/branches")
+    def name_branch(req: BranchReq):
+        """Name the storyline at a node. Naming an already-named node is a
+        rename; names must be unique across the tree."""
+        s = store.state()
+        if req.node not in s.nodes:
+            raise HTTPException(404, f"unknown node {req.node!r}")
+        name = req.name.strip()
+        if not name:
+            raise HTTPException(422, "branch name must not be empty")
+        clash = find_branch(s, name)
+        if clash and clash.id != req.node:
+            raise HTTPException(409, f"branch name {name!r} already taken")
+        return event_dict(guard(lambda: store.set_meta(
+            req.node, "branch", name)))
+
+    @app.delete("/branches/{name}")
+    def unname_branch(name: str):
+        s = store.state()
+        node = find_branch(s, name)
+        if not node:
+            raise HTTPException(404, f"unknown branch {name!r}")
+        return event_dict(guard(lambda: store.set_meta(
+            node.id, "branch", None)))
+
+    @app.post("/branches/{name}/prune")
+    def prune_branch(name: str):
+        """Tombstone the named node (hiding its subtree) and drop the name
+        -- ONE transaction, so the prune is a single undo unit. Nothing is
+        deleted: undo or restore brings the storyline back."""
+        s = store.state()
+        node = find_branch(s, name)
+        if not node:
+            raise HTTPException(404, f"unknown branch {name!r}")
+        events: list = []
+        if not node.tombstoned:
+            events.append(E.Tombstone(payload=E.NodePayload(node=node.id)))
+        events.append(E.SetMeta(payload=E.SetMetaPayload(
+            node=node.id, key="branch", value=None)))
+        return [event_dict(e) for e in guard(lambda: store.commit(events))]
+
     # -- reads ----------------------------------------------------------------
 
     @app.get("/state")
@@ -186,6 +252,23 @@ def create_app(store: EventStore, registry: StrategyRegistry) -> FastAPI:
             "stale": [] if at is not None else store.stale(leaf),
         }
 
+    @app.get("/workspace/{node}")
+    def workspace(node: str, at: int | None = None):
+        """The workspace artifacts (rejected candidates, drafts, critiques)
+        produced by the same generation run as the given node: every
+        workspace-scope node sharing its transaction, in execution order.
+        A beat_planner story node additionally shows the roadmap it
+        followed, even though the plan was committed in an earlier tx."""
+        s = store.state(at)
+        if node not in s.nodes:
+            raise HTTPException(404, f"unknown node {node!r}")
+        tx = s.nodes[node].tx
+        artifacts = sorted(
+            (n for n in s.nodes.values()
+             if n.tx == tx and n.scope == "workspace" and n.id != node),
+            key=lambda n: n.created_seq)
+        return {"tx": tx, "artifacts": [node_dict(n) for n in artifacts]}
+
     @app.get("/events")
     def events(after: int = 0):
         return [event_dict(e) for e in store.events if e.seq > after]
@@ -193,6 +276,23 @@ def create_app(store: EventStore, registry: StrategyRegistry) -> FastAPI:
     @app.get("/strategies")
     def strategies():
         return registry.list()
+
+    # -- settings (model/provider ergonomics) --------------------------------
+
+    @app.get("/settings")
+    def get_settings():
+        import importlib.util
+        return {**settings.redacted(),
+                "litellm_available":
+                    importlib.util.find_spec("litellm") is not None}
+
+    @app.put("/settings")
+    def put_settings(patch: dict[str, Any]):
+        unknown = set(patch) - {"default_model", "api_keys",
+                                "strategy_models", "default_params"}
+        if unknown:
+            raise HTTPException(422, f"unknown settings keys: {sorted(unknown)}")
+        return settings.update(patch)
 
     # -- SSE: live log replication --------------------------------------------
 
@@ -239,10 +339,26 @@ def create_app(store: EventStore, registry: StrategyRegistry) -> FastAPI:
         except KeyError as e:
             raise HTTPException(404, str(e))
 
+        # settings may resolve a real model for this request; rebind the
+        # strategy for this call only (registry instances stay untouched)
+        model_override = settings.resolve_model(req.strategy, req.params)
+        if model_override:
+            try:
+                bound = build_model(model_override, settings)
+                strategy = strategy.for_model(bound)
+            except RuntimeError as e:
+                message = str(e)  # `e` is cleared after the except block
+
+                async def failed() -> AsyncIterator[str]:
+                    yield sse("error", {"message": message})
+                return StreamingResponse(failed(),
+                                         media_type="text/event-stream")
+
         async def stream() -> AsyncIterator[str]:
             buf: list[str] = []
             try:
-                gen_params = {**req.params, "author": req.author}
+                gen_params = {**settings.generation_defaults(),
+                              **req.params, "author": req.author}
                 async for token in strategy.generate(ctx, gen_params):
                     buf.append(token)
                     yield sse("token", {"delta": token})

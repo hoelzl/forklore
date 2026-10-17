@@ -59,3 +59,21 @@ export interface SSEvent {
   event: string
   data: any
 }
+
+/** Server-side model settings (redacted: api key values are last-4 hints). */
+export interface Settings {
+  default_model: string | null
+  api_keys: Record<string, string>
+  strategy_models: Record<string, string>
+  default_params: Record<string, unknown>
+  litellm_available: boolean
+}
+
+/** A named storyline: meta.branch on the node where the name hangs. */
+export interface BranchInfo {
+  name: string
+  node: string
+  created_seq: number
+  depth: number
+  hidden: boolean
+}

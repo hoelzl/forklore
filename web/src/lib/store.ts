@@ -3,7 +3,7 @@
  *  server; we never reimplement fold/materialize here. */
 import { create } from 'zustand'
 import { api, ssePost } from '@/lib/api'
-import type { BranchMsg, Projection, TNode } from '@/types'
+import type { BranchInfo, BranchMsg, Projection, Settings, TNode } from '@/types'
 
 // -- tree helpers (pure, operate on the fetched projection) ---------------
 
@@ -82,6 +82,10 @@ interface ForkloreState {
   undoStack: string[]
   hovered: string | null
   showDeleted: boolean
+  workshop: { nodeId: string; tx: string; artifacts: TNode[] } | null
+  branches: BranchInfo[]
+  compare: { a: string; b: string } | null
+  settings: Settings | null
   error: string | null
   initialized: boolean
 
@@ -100,6 +104,15 @@ interface ForkloreState {
   setStrategy: (id: string) => void
   toggleDeleted: () => void
   clearError: () => void
+  loadSettings: () => Promise<void>
+  saveSettings: (patch: Partial<Settings>) => Promise<boolean>
+  openWorkshop: (nodeId: string) => Promise<void>
+  closeWorkshop: () => void
+  loadBranches: () => Promise<void>
+  nameBranch: (name: string, node: string) => Promise<boolean>
+  unnameBranch: (name: string) => Promise<void>
+  pruneBranch: (name: string) => Promise<void>
+  setCompare: (c: { a: string; b: string } | null) => void
 }
 
 let eventsource: EventSource | null = null
@@ -124,6 +137,10 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     undoStack: [],
     hovered: null,
     showDeleted: false,
+    workshop: null,
+    branches: [],
+    compare: null,
+    settings: null,
     error: null,
     initialized: false,
 
@@ -139,6 +156,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
           const b = await api.get(`/branch/${cursor}`)
           set({ branch: b.messages })
         }
+        await get().loadBranches()
         eventsource?.close()
         eventsource = new EventSource('/events/stream?after=0')
         eventsource.addEventListener('event', scheduleRefresh)
@@ -149,7 +167,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     },
 
     async refresh() {
-      const { cursor } = get()
+      const { cursor, workshop } = get()
       try {
         const proj: Projection = await api.get('/state')
         let cur = cursor
@@ -158,6 +176,8 @@ export const useForklore = create<ForkloreState>()((set, get) => {
         }
         const b = cur ? await api.get(`/branch/${cur}`) : { messages: [] }
         set({ proj, cursor: cur, branch: b.messages })
+        if (workshop) await get().openWorkshop(workshop.nodeId)
+        await get().loadBranches()
       } catch (e) {
         set({ error: String(e) })
       }
@@ -309,6 +329,75 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     setStrategy: (id) => set({ strategy: id }),
     toggleDeleted: () => set((s) => ({ showDeleted: !s.showDeleted })),
     clearError: () => set({ error: null }),
+
+    async loadSettings() {
+      try {
+        set({ settings: await api.get('/settings') })
+      } catch (e) {
+        set({ error: String(e) })
+      }
+    },
+
+    async saveSettings(patch) {
+      try {
+        set({ settings: await api.put('/settings', patch), error: null })
+        return true
+      } catch (e) {
+        set({ error: String(e) })
+        return false
+      }
+    },
+
+    async openWorkshop(nodeId) {
+      try {
+        const r = await api.get(`/workspace/${nodeId}`)
+        set({ workshop: { nodeId, tx: r.tx, artifacts: r.artifacts } })
+      } catch (e) {
+        set({ error: String(e) })
+      }
+    },
+
+    closeWorkshop: () => set({ workshop: null }),
+
+    async loadBranches() {
+      try {
+        set({ branches: await api.get('/branches') })
+      } catch { /* branches are cosmetic; don't noise the error pill */ }
+    },
+
+    async nameBranch(name, node) {
+      try {
+        const ev = await api.post('/branches', { name, node })
+        pushUndo(ev.tx)
+        await get().refresh()
+        return true
+      } catch (e) {
+        set({ error: String(e) })
+        return false
+      }
+    },
+
+    async unnameBranch(name) {
+      try {
+        const ev = await api.delete(`/branches/${encodeURIComponent(name)}`)
+        pushUndo(ev.tx)
+        await get().refresh()
+      } catch (e) {
+        set({ error: String(e) })
+      }
+    },
+
+    async pruneBranch(name) {
+      try {
+        const events = await api.post(`/branches/${encodeURIComponent(name)}/prune`)
+        if (events?.[0]?.tx) pushUndo(events[0].tx)
+        await get().refresh()
+      } catch (e) {
+        set({ error: String(e) })
+      }
+    },
+
+    setCompare: (c) => set({ compare: c }),
   }
 })
 

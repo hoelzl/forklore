@@ -10,6 +10,8 @@ import sys
 
 import uvicorn
 
+import importlib.util
+
 from core import EventStore
 from strategies.best_of_n import BestOfN
 from strategies.models import DemoModel, FakeModel
@@ -18,9 +20,16 @@ from strategies.simple_passthrough import SimplePassthrough
 from .app import create_app
 from .demo import seed_demo
 from .registry import StrategyRegistry
+from .settings import SettingsStore
 
-store = EventStore(sys.argv[1] if len(sys.argv) > 1 else None)
+_db_path = sys.argv[1] if len(sys.argv) > 1 else None
+store = EventStore(_db_path)
 seed_demo(store)
+
+_settings_path = os.environ.get(
+    "FORKLORE_SETTINGS",
+    (_db_path + ".settings.json") if _db_path else "forklore-settings.json")
+settings = SettingsStore(_settings_path)
 
 registry = StrategyRegistry()
 registry.register(SimplePassthrough(FakeModel(
@@ -28,7 +37,18 @@ registry.register(SimplePassthrough(FakeModel(
           "\"{last}\" lingered in the air a moment longer than it should have.")))
 registry.register(BestOfN(DemoModel()))
 
-app = create_app(store, registry)
+if importlib.util.find_spec("langgraph") is not None:
+    from strategies.langgraph_crew import LangGraphCrew
+    registry.register(LangGraphCrew(DemoModel()))
+else:
+    print("note: langgraph not installed — langgraph_crew unavailable "
+          "(pip install langgraph to enable)")
+
+app = create_app(store, registry, settings)
+
+if importlib.util.find_spec("litellm") is None:
+    print("note: litellm not installed — settings can store a model, but "
+          "generation with it needs: pip install litellm")
 
 _dist = os.environ.get("FORKLORE_DIST")
 if _dist and os.path.isdir(_dist):

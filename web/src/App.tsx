@@ -2,12 +2,14 @@ import { useEffect } from 'react'
 import TopBar from '@/components/TopBar'
 import TreePane from '@/components/TreePane'
 import ChatPane from '@/components/ChatPane'
+import ComparePane from '@/components/ComparePane'
 import { useForklore } from '@/lib/store'
 
 export default function App() {
   const init = useForklore((s) => s.init)
   const error = useForklore((s) => s.error)
   const clearError = useForklore((s) => s.clearError)
+  const comparing = useForklore((s) => s.compare !== null)
 
   useEffect(() => {
     void init()
@@ -20,7 +22,7 @@ export default function App() {
         <div className="hidden md:flex min-h-0 flex-col">
           <TreePane />
         </div>
-        <ChatPane />
+        {comparing ? <ComparePane /> : <ChatPane />}
       </div>
       {error && (
         <div

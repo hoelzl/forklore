@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   GitBranch,
+  Layers,
   Pencil,
   RefreshCw,
   Sparkles,
@@ -16,6 +17,7 @@ import {
 } from '@/lib/store'
 import type { BranchMsg } from '@/types'
 import { Button } from '@/components/ui/button'
+import WorkshopPanel from '@/components/WorkshopPanel'
 
 function authorLabel(author: string) {
   return author === 'you' ? 'you' : author
@@ -43,6 +45,7 @@ function MessageItem({
   const setCursor = useForklore((s) => s.setCursor)
   const branchLen = useForklore((s) => s.branch.length)
   const streaming = useForklore((s) => s.streaming.active)
+  const openWorkshop = useForklore((s) => s.openWorkshop)
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(msg.content)
@@ -93,6 +96,16 @@ function MessageItem({
               Number(node.generation.params.rank) + 1} of ${node.generation.params.n}`}
           >
             score {String(node.generation.params.score)}
+          </span>
+        )}
+        {node.generation?.params?.rounds !== undefined && (
+          <span
+            className="chip"
+            title={`${String(node.generation.params.rounds)} revision round(s) · final verdict ${
+              String(node.generation.params.verdict ?? '—')}`}
+          >
+            {String(node.generation.params.rounds)} round
+            {Number(node.generation.params.rounds) === 1 ? '' : 's'}
           </span>
         )}
         {node.generation && (
@@ -169,6 +182,15 @@ function MessageItem({
                 <ChevronRight className="size-4" />
               </button>
             </span>
+          )}
+          {node.generation && (
+            <button
+              className="icon-btn"
+              onClick={() => void openWorkshop(msg.node)}
+              title="inspect the generation run — candidates, drafts, critiques"
+            >
+              <Layers className="size-3.5" />
+            </button>
           )}
           <button className="icon-btn" onClick={startEdit} title="edit">
             <Pencil className="size-3.5" />
@@ -322,32 +344,35 @@ export default function ChatPane() {
   }
 
   return (
-    <main className="min-h-0 flex flex-col">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto fl-scroll">
-        <div className="mx-auto max-w-[70ch] px-8 py-8">
-          {branch.map((m, i) => (
-            <MessageItem
-              key={m.node}
-              msg={m}
-              index={i}
-              isStale={stale.has(m.node)}
-            />
-          ))}
-          {streaming.active && (
-            <article className="msg">
-              <header className="flex items-baseline gap-2.5 mb-2">
-                <span className="eyebrow">character</span>
-                <span className="hint">{strategy}</span>
-              </header>
-              <p className="manuscript">
-                {streaming.text}
-                <span className="caret" />
-              </p>
-            </article>
-          )}
+    <main className="min-h-0 flex">
+      <div className="min-w-0 flex-1 flex flex-col">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto fl-scroll">
+          <div className="mx-auto max-w-[70ch] px-8 py-8">
+            {branch.map((m, i) => (
+              <MessageItem
+                key={m.node}
+                msg={m}
+                index={i}
+                isStale={stale.has(m.node)}
+              />
+            ))}
+            {streaming.active && (
+              <article className="msg">
+                <header className="flex items-baseline gap-2.5 mb-2">
+                  <span className="eyebrow">character</span>
+                  <span className="hint">{strategy}</span>
+                </header>
+                <p className="manuscript">
+                  {streaming.text}
+                  <span className="caret" />
+                </p>
+              </article>
+            )}
+          </div>
         </div>
+        <Composer />
       </div>
-      <Composer />
+      <WorkshopPanel />
     </main>
   )
 }

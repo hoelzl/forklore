@@ -32,6 +32,11 @@ class SimplePassthrough:
         self.model = model
         self.model_name = model.name
 
+    def for_model(self, model: ChatModel) -> "SimplePassthrough":
+        """A copy of this strategy bound to a different model (used by the
+        server when settings resolve a real model for one request)."""
+        return SimplePassthrough(model)
+
     async def generate(self, ctx, params: dict[str, Any]) -> AsyncIterator[str]:
         prompt = truncate(ctx.materialize(), params.get("max_messages"))
         ctx.record_prompt(prompt)

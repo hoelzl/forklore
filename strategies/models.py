@@ -51,9 +51,10 @@ class ScriptedModel:
 
 
 class DemoModel:
-    """Deterministic but varied stand-in for the demo/preview: cycles
-    through candidate continuations; when the last message is authored by
-    "critic" (a scoring prompt), cycles through canned scores instead."""
+    """Deterministic but varied stand-in for the demo/preview. Cycles
+    through candidate continuations for narrative turns, directions for
+    "director" turns, and verdict-with-score lines for "critic" turns
+    (the trailing "N/10" keeps best_of_n's score parser working)."""
 
     def __init__(self, replies: list[str] | None = None,
                  scores: list[str] | None = None, name: str = "demo"):
@@ -70,13 +71,29 @@ class DemoModel:
             "Mara struck the match anyway. Some instructions are only "
             "ever written to be disobeyed.",
         ])
-        self._scores = itertools.cycle(scores or ["8", "6", "9", "5", "7"])
+        self._verdicts = itertools.cycle(scores or [
+            "VERDICT: REVISE — the image is strong but the pacing sags. 6/10",
+            "VERDICT: PASS — the beat lands cleanly and turns the scene. 9/10",
+            "VERDICT: REVISE — too much is explained; trust the reader. 5/10",
+            "VERDICT: PASS — quiet, exact, and forward-moving. 8/10",
+        ])
+        self._directions = itertools.cycle([
+            "Let Mara discover that the log's last entry is dated tomorrow.",
+            "Turn the screw: the blue flame answers a question she did "
+            "not ask aloud.",
+            "Give the lighthouse a want of its own, and let Mara feel it.",
+        ])
         self.name = name
 
     async def stream(self, messages: list[Message],
                      params: dict[str, Any]) -> AsyncIterator[str]:
-        text = (next(self._scores) if messages and messages[-1].author == "critic"
-                else next(self._replies))
+        last = messages[-1].author if messages else ""
+        if last == "critic":
+            text = next(self._verdicts)
+        elif last == "director":
+            text = next(self._directions)
+        else:
+            text = next(self._replies)
         words = text.split(" ")
         for i, w in enumerate(words):
             yield w if i == len(words) - 1 else w + " "
@@ -94,13 +111,24 @@ class LiteLLMModel:
         self.system = system
         self.defaults = defaults
 
+    @staticmethod
+    def role_of(author: str) -> str:
+        """Narrative voices keep their dialogue roles; meta-roles used by
+        orchestrating strategies (director/critic/drafter instructions)
+        are mapped to user turns, which is how instruction prompts behave
+        best on chat APIs."""
+        if author == "system":
+            return "system"
+        if author in ("you", "user", "director", "critic", "drafter"):
+            return "user"
+        return "assistant"
+
     async def stream(self, messages: list[Message],
                      params: dict[str, Any]) -> AsyncIterator[str]:
-        role_map = {"user": "user"}
         wire = ([{"role": "system", "content": self.system}]
                 if self.system else [])
-        wire += [{"role": role_map.get(m.author, "assistant"),
-                  "content": m.content} for m in messages]
+        wire += [{"role": self.role_of(m.author), "content": m.content}
+                 for m in messages]
         resp = await self._litellm.acompletion(
             model=self.name, messages=wire, stream=True,
             **{**self.defaults, **params})

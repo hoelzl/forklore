@@ -31,6 +31,8 @@ class Node:
     meta: dict[str, Any] = field(default_factory=dict)
     children: list[NodeId] = field(default_factory=list)
     last_revise_seq: int = 0            # seq of latest Revise (or creation)
+    tx: str = ""                        # tx that created the node: links
+                                        # siblings of one generation run
 
     @property
     def content(self) -> str:
@@ -108,7 +110,7 @@ def apply(state: TreeState, ev: AnyEvent) -> None:
         node = Node(
             id=p.node, parent=p.parent, author=p.author, scope=p.scope,
             created_seq=ev.seq, versions=[p.content], generation=p.meta,
-            last_revise_seq=ev.seq,
+            last_revise_seq=ev.seq, tx=ev.tx,
         )
         state.nodes[p.node] = node
         if p.parent is None:

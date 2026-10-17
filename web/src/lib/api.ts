@@ -23,6 +23,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? '{}' : JSON.stringify(body),
     }),
+  put: (path: string, body: unknown) =>
+    req(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  delete: (path: string) => req(path, { method: 'DELETE' }),
 }
 
 /** Parse an SSE stream from a POST response body. */

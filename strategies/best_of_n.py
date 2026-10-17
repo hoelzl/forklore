@@ -63,6 +63,12 @@ class BestOfN:
         self.critic = critic or model
         self.model_name = model.name
 
+    def for_model(self, model: ChatModel) -> "BestOfN":
+        """A copy bound to a different model; the critic follows the new
+        model unless one was explicitly supplied at construction."""
+        explicit = None if self.critic is self.model else self.critic
+        return BestOfN(model, critic=explicit)
+
     async def generate(self, ctx, params: dict[str, Any]) -> AsyncIterator[str]:
         n = int(params.get("n", 3))
         k = max(1, min(int(params.get("k", 2)), n))
