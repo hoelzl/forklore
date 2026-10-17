@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-_CHOICE_LINE_RE = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s+")
+_CHOICE_LINE_RE = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s*")
 
 
 def parse_crossroads_output(text: str) -> tuple[str, list[str]]:
@@ -27,9 +27,9 @@ def parse_crossroads_output(text: str) -> tuple[str, list[str]]:
     if "CHOICES:" in body:
         body, _, choice_block = body.partition("CHOICES:")
         for line in choice_block.strip().splitlines():
-            line = line.strip()
-            if line:
-                choices.append(_CHOICE_LINE_RE.sub("", line))
+            choice = _CHOICE_LINE_RE.sub("", line.strip()).strip()
+            if choice:
+                choices.append(choice)
         choices = choices[:3]
     if "PASSAGE:" in body:
         body = body.split("PASSAGE:", 1)[1]

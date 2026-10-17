@@ -38,3 +38,8 @@ def test_extra_choices_trimmed_to_three():
 def test_empty_choice_lines_skipped():
     text = "PASSAGE:\nP.\n\nCHOICES:\n- a\n\n- b\n"
     assert parse_crossroads_output(text)[1] == ["a", "b"]
+
+
+def test_bare_marker_choice_lines_skipped():
+    text = "PASSAGE:\nP.\n\nCHOICES:\n- a\n-\n- b\n- c"
+    assert parse_crossroads_output(text)[1] == ["a", "b", "c"]
