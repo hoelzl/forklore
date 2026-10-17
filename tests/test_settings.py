@@ -34,6 +34,13 @@ def test_provider_of(model, provider):
     assert provider_of(model) == provider
 
 
+def test_provider_of_image_models():
+    from server.settings import provider_of
+    assert provider_of("dall-e-3") == "openai"
+    assert provider_of("openai/dall-e-3") == "openai"
+    assert provider_of("gpt-image-1") == "openai"
+
+
 # -- store semantics -------------------------------------------------------------
 
 def test_update_redacts_and_deletes(tmp_path):

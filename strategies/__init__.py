@@ -12,6 +12,9 @@ The spectrum, all behind the same interface:
     best_of_n            N candidates -> scoring -> top-k committed as siblings
     langgraph_crew       director/drafter/critic orchestration; scratch work
                          persisted as scope="workspace" nodes in one tx
+    crossroads           choice-driven play: `guide` meta-role carries the
+                         reader's choice; per-node image committed as meta
+                         in the same tx
 
 LangGraph & co. are per-strategy implementation details and must never
 leak into core. The registry key (GenerationMeta.strategy) is recorded on

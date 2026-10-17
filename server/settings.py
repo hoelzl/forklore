@@ -17,8 +17,8 @@ Resolution order for a generation request:
 override chain, and strategies without `for_image_model` ignore it.
 
 Provider inference follows litellm's "provider/model" convention, with
-bare "gpt-*"/"o1-*"/"o3-*" mapping to openai and bare "claude-*" to
-anthropic. ollama and other local providers need no key.
+bare "gpt-*"/"o1-*"/"o3-*"/"dall-e-*" mapping to openai and bare
+"claude-*" to anthropic. ollama and other local providers need no key.
 """
 from __future__ import annotations
 
@@ -125,7 +125,8 @@ def provider_of(model: str) -> str | None:
     if "/" in model:
         return model.split("/", 1)[0].lower()
     low = model.lower()
-    if low.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-")):
+    if low.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-",
+                       "dall-e-", "gpt-image-")):
         return "openai"
     if low.startswith("claude"):
         return "anthropic"

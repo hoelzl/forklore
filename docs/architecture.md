@@ -151,6 +151,9 @@ as node meta in the same transaction).
   `str(e)` in a local before defining a closure that reports it.
 - SQLite under FastAPI: `check_same_thread=False` + a lock around commit.
 - SSE follow loops must have a `follow` escape for tests, or pytest hangs.
+- `core/undo.py` SetMeta compensation: use `pre.nodes.get(p.node)` — the
+  node may have been created in the same tx (planned commit + SetMeta),
+  and direct indexing crashes undo with KeyError.
 
 ## Dev workflow
 
