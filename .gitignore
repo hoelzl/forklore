@@ -7,3 +7,6 @@ node_modules/
 dist/
 web/node_modules/
 web/dist/
+*.media/
+forklore.media/
+.worktrees/
