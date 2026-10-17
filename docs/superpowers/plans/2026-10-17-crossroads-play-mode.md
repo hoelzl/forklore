@@ -1784,6 +1784,14 @@ Note: choice buttons are disabled unless the selected strategy is
 `crossroads/0.1` — other strategies don't supply `choices` params, and the
 free-form box still works with any strategy (it just passes `choice`).
 
+> **Implementation notes (landed):** review found the free-form path could
+> leak `choice`/`guidance` into `litellm.acompletion` when a non-crossroads
+> strategy is selected (unknown kwargs → provider 400). Landed behavior:
+> `ChoicePanel` renders only a hint unless the crossroads strategy is
+> selected; `choose` is async and keeps the drafts on SSE error; choice
+> keys are index-qualified; the free-form input has an aria-label; images
+> re-scroll the pane on load.
+
 - [ ] **Step 2: Typecheck**
 
 Run: `cd web && npm run build`
