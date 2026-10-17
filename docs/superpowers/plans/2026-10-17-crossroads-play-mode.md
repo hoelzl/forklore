@@ -1021,7 +1021,8 @@ def _generate(client, params=None):
 def test_turn_commits_passage_choices_and_image(client):
     events = _generate(client, {"choice": "Open it", "guidance": "keep it quiet"})
     committed = next(d for k, d in events if k == "committed")["events"]
-    story = [e for e in committed if e["payload"]["scope"] == "story"]
+    story = [e for e in committed
+             if e["kind"] == "append" and e["payload"]["scope"] == "story"]
     assert len(story) == 1
     payload = story[0]["payload"]
     assert payload["content"] == "She stepped inside, and the dust rose to meet her."
@@ -1057,7 +1058,8 @@ def test_malformed_reply_degrades_to_free_form_only():
     client = TestClient(create_app(store, registry))
     events = _generate(client)
     committed = next(d for k, d in events if k == "committed")["events"]
-    story = [e for e in committed if e["payload"]["scope"] == "story"]
+    story = [e for e in committed
+             if e["kind"] == "append" and e["payload"]["scope"] == "story"]
     assert story[0]["payload"]["content"] == \
         "A plain reply with no structure at all."
     assert story[0]["payload"]["meta"]["params"]["choices"] == []
