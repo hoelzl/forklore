@@ -91,6 +91,16 @@ class DemoModel:
             "2. Below: a second light, burning blue, and a chair still warm.\n"
             "3. The chair's occupant returns — wearing Mara's face.",
         ])
+        self._guided = itertools.cycle([
+            "PASSAGE:\nMara opened the log to its final page, and the "
+            "date at the top was tomorrow's.\n\nCHOICES:\n"
+            "- Read the entry aloud\n- Tear out the page\n"
+            "- Show it to the blue flame",
+            "PASSAGE:\nThe flame dimmed as she approached, folding "
+            "itself small, like something hoping not to be seen.\n\n"
+            "CHOICES:\n- Cup the flame in her hands\n"
+            "- Ask it a question\n- Leave it burning and walk away",
+        ])
         self.name = name
 
     async def stream(self, messages: list[Message],
@@ -102,6 +112,8 @@ class DemoModel:
             text = next(self._directions)
         elif last == "planner":
             text = next(self._beat_sheets)
+        elif last == "guide":
+            text = next(self._guided)
         else:
             text = next(self._replies)
         words = text.split(" ")
@@ -130,7 +142,7 @@ class LiteLLMModel:
         if author == "system":
             return "system"
         if author in ("you", "user", "director", "critic", "drafter",
-                      "planner"):
+                      "planner", "guide"):
             return "user"
         return "assistant"
 

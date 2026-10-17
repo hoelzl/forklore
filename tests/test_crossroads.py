@@ -1,5 +1,6 @@
 """crossroads: PASSAGE:/CHOICES: parsing, choice/guidance provenance,
 one-tx commits with image SetMeta, degradation paths."""
+import asyncio
 import json
 
 import pytest
@@ -136,3 +137,34 @@ def test_bad_image_payload_yields_sse_error():
     kinds = [k for k, _ in events]
     assert "error" in kinds
     assert "committed" not in kinds
+
+
+from core.materialize import Message
+from strategies.models import DemoModel, LiteLLMModel
+
+
+def _msg(author, content="x"):
+    return Message(node="", author=author, content=content,
+                   version=1, pinned=False, scope="story")
+
+
+def test_guide_maps_to_user_role():
+    assert LiteLLMModel.role_of("guide") == "user"
+
+
+def test_demo_model_answers_guide_turns_in_crossroads_format():
+    async def run():
+        model = DemoModel()
+        return "".join([t async for t in model.stream([_msg("guide")], {})])
+    text = asyncio.run(run())
+    passage, choices = parse_crossroads_output(text)
+    assert passage
+    assert len(choices) == 3
+
+
+def test_demo_model_director_cycle_unchanged():
+    async def run():
+        model = DemoModel()
+        return "".join([t async for t in model.stream([_msg("director")], {})])
+    text = asyncio.run(run())
+    assert "PASSAGE:" not in text  # director stays a direction line
