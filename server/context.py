@@ -53,3 +53,15 @@ class StoreBranchContext:
             "author": author, "meta_extra": meta_extra or {},
             "meta": meta or {}, "image": image,
         })
+
+    def steering(self) -> list[Message]:
+        """Steering briefs (kind="steering" meta) on the path to the
+        leaf, root -> leaf, with pin-resolved versions. Empty when the
+        branch has none. Strategies decide whether/how to include them
+        in the prompt; record_prompt keeps context_hash honest."""
+        state = self._store.state()
+        return [
+            m for m in self._store.materialize(
+                self.leaf, include_workspace=True)
+            if state.nodes[m.node].meta.get("kind") == "steering"
+        ]
