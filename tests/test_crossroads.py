@@ -259,6 +259,8 @@ def test_image_failure_still_commits_the_node():
     kinds = [e["kind"] for e in committed]
     assert kinds == ["append"]  # no image SetMeta
     assert committed[0]["payload"]["content"].startswith("She stepped inside")
+    params = committed[0]["payload"]["meta"]["params"]
+    assert params["image_error"] == "provider down"
 
 
 def test_guidance_in_prompt_but_never_in_story():
@@ -299,3 +301,17 @@ def test_steering_briefs_prepended_as_director_messages():
     assert len(directors) == 1
     assert "Tone: gothic, quiet, exact." in directors[0].content
     assert prompt[-1].author == "guide"
+
+
+def test_empty_passage_yields_sse_error():
+    store = EventStore()
+    store.append_node(None, "you", "The door was open.", node_id="A")
+    registry = StrategyRegistry()
+    registry.register(Crossroads(
+        ScriptedModel(["PASSAGE:\n\nCHOICES:\n- a\n- b\n- c"]),
+        DemoImageModel()))
+    client = TestClient(create_app(store, registry))
+    events = _generate(client)
+    kinds = [k for k, _ in events]
+    assert "error" in kinds
+    assert "committed" not in kinds
