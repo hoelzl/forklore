@@ -117,6 +117,11 @@ def test_extra_choices_trimmed_to_three():
 def test_empty_choice_lines_skipped():
     text = "PASSAGE:\nP.\n\nCHOICES:\n- a\n\n- b\n"
     assert parse_crossroads_output(text)[1] == ["a", "b"]
+
+
+def test_bare_marker_choice_lines_skipped():
+    text = "PASSAGE:\nP.\n\nCHOICES:\n- a\n-\n- b\n- c"
+    assert parse_crossroads_output(text)[1] == ["a", "b", "c"]
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -143,7 +148,7 @@ from __future__ import annotations
 
 import re
 
-_CHOICE_LINE_RE = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s+")
+_CHOICE_LINE_RE = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s*")
 
 
 def parse_crossroads_output(text: str) -> tuple[str, list[str]]:
@@ -151,16 +156,17 @@ def parse_crossroads_output(text: str) -> tuple[str, list[str]]:
 
     Degrades gracefully: no PASSAGE: marker -> the whole reply is the
     passage; no CHOICES: marker -> no choices. Choice lines may be
-    bulleted or numbered; at most three are kept.
+    bulleted or numbered; bare markers and blank lines are skipped;
+    at most three are kept.
     """
     body = text.strip()
     choices: list[str] = []
     if "CHOICES:" in body:
         body, _, choice_block = body.partition("CHOICES:")
         for line in choice_block.strip().splitlines():
-            line = line.strip()
-            if line:
-                choices.append(_CHOICE_LINE_RE.sub("", line))
+            choice = _CHOICE_LINE_RE.sub("", line.strip()).strip()
+            if choice:
+                choices.append(choice)
         choices = choices[:3]
     if "PASSAGE:" in body:
         body = body.split("PASSAGE:", 1)[1]
@@ -1163,7 +1169,9 @@ class Crossroads:
         raw = await collect(self.model.stream(prompt, {}))
         passage, choices = parse_crossroads_output(raw)
         if not passage:
-            passage = raw.strip()
+            # empty passage: fall back to the pre-CHOICES body, never to
+            # the raw reply (which would carry the markers into the story)
+            passage = raw.partition("CHOICES:")[0].removeprefix("PASSAGE:").strip()
 
         image_prompt = ("Illustration for a story passage: "
                         + " ".join(passage.split()[:40]))
