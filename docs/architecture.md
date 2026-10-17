@@ -65,9 +65,12 @@ async def generate(self, ctx, params) -> AsyncIterator[str]: ...
   `ctx.record_prompt(base)` with the *exact* prompt messages so
   `context_hash` covers whatever your truncation/assembly actually kept.
 - **Declare results** with `ctx.plan_node(content=..., scope=...,
-  meta_extra=...)`. The server commits ALL planned nodes in one transaction,
-  stamped with GenerationMeta (`meta_extra` lands in `params`). A strategy
-  that plans nothing falls back to the legacy single-append contract.
+  meta_extra=..., meta=..., image=...)`. The server commits ALL planned
+  nodes in one transaction, stamped with GenerationMeta (`meta_extra` lands
+  in `params`); `meta` becomes node meta and `image` is saved to the media
+  store and referenced as meta `"image"`, both via SetMeta events in the
+  same tx. A strategy that plans nothing falls back to the legacy
+  single-append contract.
 - **Stream** the user-facing text by yielding tokens. Usually the collected
   winner re-streamed word-by-word, so the UI feels live.
 - **Model access** is always `self.model.stream(messages, params)` — an

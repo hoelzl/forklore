@@ -78,7 +78,9 @@ def compensations(log: list[AnyEvent], tx: str) -> list[AnyEvent]:
                     node=p.node, via_child=p.via_child,
                     version=pre.pins[key])))
         elif isinstance(ev, E.SetMeta):
-            before = pre.nodes[p.node].meta.get(p.key)
+            node_before = pre.nodes.get(p.node)
+            # node created in this same tx has no pre-tx meta: before = None
+            before = node_before.meta.get(p.key) if node_before else None
             if head.nodes[p.node].meta.get(p.key) != before:
                 out.append(E.SetMeta(payload=E.SetMetaPayload(
                     node=p.node, key=p.key, value=before)))

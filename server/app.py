@@ -390,10 +390,14 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                 ctx_hash = hash_messages(prompt)
 
                 if ctx.planned:
-                    # strategy declared its nodes: commit all in ONE tx
-                    planned_events = [
-                        E.Append(payload=E.AppendPayload(
-                            node=uuid4().hex, parent=req.leaf,
+                    # strategy declared its nodes: commit all in ONE tx,
+                    # with declared node meta and image refs as SetMeta
+                    # events in the same transaction
+                    planned_events: list = []
+                    for p in ctx.planned:
+                        node_id = uuid4().hex
+                        planned_events.append(E.Append(payload=E.AppendPayload(
+                            node=node_id, parent=req.leaf,
                             author=p["author"] or req.author,
                             content=p["content"], scope=p["scope"],
                             meta=GenerationMeta(
@@ -402,9 +406,16 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                                               "unknown"),
                                 params={**req.params, **p["meta_extra"]},
                                 watermark=ctx.watermark,
-                                context_hash=ctx_hash)))
-                        for p in ctx.planned
-                    ]
+                                context_hash=ctx_hash))))
+                        for key, value in p["meta"].items():
+                            planned_events.append(E.SetMeta(
+                                payload=E.SetMetaPayload(
+                                    node=node_id, key=key, value=value)))
+                        if p["image"] is not None:
+                            planned_events.append(E.SetMeta(
+                                payload=E.SetMetaPayload(
+                                    node=node_id, key="image",
+                                    value=media.save(p["image"]))))
                     committed = store.commit(
                         planned_events, actor=f"strategy:{strategy.id}")
                 else:
@@ -420,7 +431,8 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                         actor=f"strategy:{strategy.id}")]
 
                 story_events = [e for e in committed
-                                if e.payload.scope == "story"]
+                                if isinstance(e, E.Append)
+                                and e.payload.scope == "story"]
                 yield sse("committed", {
                     "events": [event_dict(e) for e in committed],
                     # backward compat: the first story append

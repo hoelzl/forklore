@@ -40,10 +40,16 @@ class StoreBranchContext:
 
     def plan_node(self, *, content: str, scope: str = "story",
                   author: str | None = None,
-                  meta_extra: dict | None = None) -> None:
+                  meta_extra: dict | None = None,
+                  meta: dict | None = None,
+                  image: bytes | None = None) -> None:
         """Declare a node to be committed under the leaf on completion
-        (the server commits all planned nodes in one transaction)."""
+        (the server commits all planned nodes in one transaction).
+        `meta` becomes node meta via SetMeta events in the same tx;
+        `image` is saved to the media store and referenced as meta
+        "image" in the same tx."""
         self.planned.append({
             "content": content, "scope": scope,
             "author": author, "meta_extra": meta_extra or {},
+            "meta": meta or {}, "image": image,
         })
