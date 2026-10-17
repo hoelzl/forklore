@@ -402,7 +402,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     },
 
     setCompare: (c) => set({ compare: c }),
-    setPlay: (on) => set({ play: on }),
+    setPlay: (on) => set((s) => ({ play: on, compare: on ? null : s.compare })),
   }
 })
 

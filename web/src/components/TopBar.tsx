@@ -54,6 +54,7 @@ export default function TopBar() {
         <Button
           variant={play ? 'outline' : 'ghost'}
           size="sm"
+          aria-pressed={play}
           onClick={() => setPlay(true)}
           title="play mode: read, choose, steer"
         >
@@ -62,6 +63,7 @@ export default function TopBar() {
         <Button
           variant={!play ? 'outline' : 'ghost'}
           size="sm"
+          aria-pressed={!play}
           onClick={() => setPlay(false)}
           title="workbench mode: tree, edits, workshop"
         >
