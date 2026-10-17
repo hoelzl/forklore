@@ -42,9 +42,13 @@ reproducibility.
 - `simple_passthrough/0.1` — materialized branch → one model call. The baseline.
 - `best_of_n/0.1` — N candidates, critic-scored, top-k committed as story
   siblings; all drafts retained in the workspace.
+- `langgraph_crew/0.1` — director → drafter → critic pipeline with a bounded
+  revision loop (LangGraph); every artifact persisted to the workspace.
+- `beat_planner/0.1` — plans the next k beats as a workspace roadmap, then
+  drafts one beat per generation; progress is derived from the tree.
 
-The interface is designed so that a multi-agent orchestrator (director /
-drafter / critic, LangGraph-based, …) is just another strategy.
+See [docs/architecture.md](docs/architecture.md) for the strategy-authoring
+contract and the load-bearing invariants.
 
 ## Layout
 
@@ -56,8 +60,10 @@ server/        FastAPI + SSE: commit routes, projections, strategy registry,
 strategies/    strategy implementations + model clients (Fake/Scripted/Demo/
                LiteLLM)
 web/           React + TypeScript + Vite client: manuscript chat pane with
-               swipe/edit/diverge, React Flow story tree, SSE streaming
-tests/         48 tests encoding the semantics (the worked trace included)
+               swipe/edit/diverge, React Flow story tree, SSE streaming,
+               generation workshop panel, branch comparison, settings
+tests/         96 tests encoding the semantics (the worked trace included)
+docs/          architecture invariants and the strategy contract
 Dockerfile     all-in-one image (web build + server)
 ```
 
@@ -78,8 +84,10 @@ python -m server                 # API on :8000, seeds a demo story
 cd web && npm install && npm run dev   # client on :3000, proxies to :8000
 ```
 
-**Real models:** register `LiteLLMModel` in `server/__main__.py`
-(`pip install litellm`, set your provider keys as usual).
+**Real models:** `pip install litellm`, then open the settings dialog (gear
+icon) and set a default model + provider key — or edit the settings JSON
+directly. Without configuration everything runs on a deterministic demo
+model, offline.
 
 **Tests:** `pip install pytest && python -m pytest`
 
@@ -91,3 +99,7 @@ cd web && npm install && npm run dev   # client on :3000, proxies to :8000
 projections, watermark reads, log replication.
 `POST /generate` — SSE token stream, then the committed event(s).
 `GET /events/stream` — live log tail (SSE, resumable by seq).
+`GET|PUT /settings` — model/provider config (keys redacted on read).
+`GET /workspace/{node}` — the artifacts of a generation run.
+`GET|POST|DELETE /branches` · `POST /branches/{name}/prune` — named
+storylines and recoverable pruning.
