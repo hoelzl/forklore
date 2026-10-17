@@ -42,13 +42,19 @@ contract (`id`, `__init__(model)`, `for_model`, async `generate(ctx,
 params)` yielding tokens).
 
 **Prompt assembly:** `ctx.materialize()` for the story so far, then one
-trailing `director` meta-role message combining the chosen label and the
+trailing `guide` meta-role message combining the chosen label and the
 one-shot guidance:
 
     The reader chose: <choice>. Direction: <guidance>.
     Write the next passage, then propose three choices.
 
-`director` is reused, so `LiteLLMModel.role_of` needs no new role.
+`guide` is a new meta-role, added to `LiteLLMModel.role_of` AND the
+`DemoModel` reply cycle per the AGENTS.md convention. (Plan-level
+correction: the spec originally said to reuse `director`, but
+`DemoModel` dispatches replies by the *last* message's author and
+`director` is already bound to langgraph_crew's direction lines —
+reusing it would break one demo or the other. Steering briefs are still
+prepended as `director` messages; they are never the last message.)
 `ctx.record_prompt(...)` is called with the exact messages, per the
 reproducibility contract.
 
