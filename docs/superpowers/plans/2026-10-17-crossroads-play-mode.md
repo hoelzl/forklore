@@ -582,7 +582,18 @@ git commit -m "server: GET /media/{name} endpoint"
 **Files:**
 - Modify: `server/context.py` (`plan_node`)
 - Modify: `server/app.py` (planned-commit block)
+- Modify: `strategies/__init__.py` (`BranchContext` protocol signature)
 - Test: `tests/test_crossroads.py` (commit-shape tests live here; they use a stub strategy)
+
+> **Implementation notes (landed):** two integration fixes were required
+> beyond the original file list: (a) the SSE `story_events` filter uses
+> `isinstance(e, E.Append)` — `SetMetaPayload` has no `.scope`; (b)
+> `core/undo.py`'s SetMeta compensation uses `pre.nodes.get(p.node)` with
+> `before = None` for nodes created in the same tx (a latent crash newly
+> reachable once Append+SetMeta share a tx; no behavior change otherwise).
+> The `BranchContext` protocol gained the same kwargs; the meta key
+> `"image"` is reserved; a bad-image payload yields an SSE `error` event
+> (covered by `test_bad_image_payload_yields_sse_error`).
 
 - [ ] **Step 1: Write the failing tests**
 
