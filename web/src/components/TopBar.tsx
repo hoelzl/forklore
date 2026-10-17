@@ -16,6 +16,8 @@ export default function TopBar() {
   const settings = useForklore((s) => s.settings)
   const loadSettings = useForklore((s) => s.loadSettings)
   const branchCount = useForklore((s) => s.branches.length)
+  const play = useForklore((s) => s.play)
+  const setPlay = useForklore((s) => s.setPlay)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [branchesOpen, setBranchesOpen] = useState(false)
 
@@ -48,6 +50,24 @@ export default function TopBar() {
           ))}
         </select>
       )}
+      <span className="flex gap-1">
+        <Button
+          variant={play ? 'outline' : 'ghost'}
+          size="sm"
+          onClick={() => setPlay(true)}
+          title="play mode: read, choose, steer"
+        >
+          play
+        </Button>
+        <Button
+          variant={!play ? 'outline' : 'ghost'}
+          size="sm"
+          onClick={() => setPlay(false)}
+          title="workbench mode: tree, edits, workshop"
+        >
+          workbench
+        </Button>
+      </span>
       <button
         className="chip bg-transparent cursor-pointer hover:text-foreground transition-colors"
         title={activeModel

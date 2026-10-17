@@ -98,6 +98,14 @@ function MessageItem({
             score {String(node.generation.params.score)}
           </span>
         )}
+        {node.generation?.params?.choice != null && (
+          <span
+            className="chip"
+            title="the reader's choice that led to this passage"
+          >
+            chose: {String(node.generation.params.choice)}
+          </span>
+        )}
         {node.generation?.params?.beat !== undefined && (
           <span
             className="chip"

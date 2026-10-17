@@ -11,7 +11,7 @@ export default defineConfig({
     port: 3000,
     // dev: proxy API + SSE to the forklore server (python -m server)
     proxy: Object.fromEntries(
-      ['/nodes', '/state', '/branch', '/events', '/strategies', '/generate', '/undo']
+      ['/nodes', '/state', '/branch', '/events', '/strategies', '/generate', '/undo', '/media']
         .map((p) => [p, { target: 'http://localhost:8000', changeOrigin: true }]),
     ),
   },
