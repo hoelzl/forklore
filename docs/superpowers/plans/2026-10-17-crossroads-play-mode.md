@@ -386,6 +386,12 @@ def test_traversal_and_bad_names_rejected():
 def test_unknown_name_reads_none():
     store = MediaStore()
     assert store.read("a" * 64 + ".svg") is None
+
+
+def test_trailing_newline_name_rejected():
+    store = MediaStore()
+    assert store.read("a" * 64 + ".svg
+") is None
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -442,7 +448,7 @@ class MediaStore:
 
     def read(self, name: str) -> tuple[bytes, str] | None:
         """(bytes, content_type), or None for unknown/invalid names."""
-        m = _NAME_RE.match(name)
+        m = _NAME_RE.fullmatch(name)
         if not m:
             return None
         content_type = _CONTENT_TYPES[m.group(1)]
@@ -459,7 +465,7 @@ class MediaStore:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_media.py -v`
-Expected: 10 passed (4 image-model + 6 media-store)
+Expected: 11 passed (4 image-model + 7 media-store)
 
 - [ ] **Step 5: Commit**
 
