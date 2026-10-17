@@ -3,6 +3,7 @@ import asyncio
 
 import pytest
 
+from server.media import MediaStore
 from strategies.images import DemoImageModel
 
 
@@ -34,8 +35,6 @@ def test_demo_image_metadata():
     assert DemoImageModel.ext == "svg"
     assert DemoImageModel.name
 
-
-from server.media import MediaStore
 
 _SVG = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
 _PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
@@ -80,3 +79,8 @@ def test_traversal_and_bad_names_rejected():
 def test_unknown_name_reads_none():
     store = MediaStore()
     assert store.read("a" * 64 + ".svg") is None
+
+
+def test_trailing_newline_name_rejected():
+    store = MediaStore()
+    assert store.read("a" * 64 + ".svg\n") is None

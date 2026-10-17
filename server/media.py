@@ -44,7 +44,7 @@ class MediaStore:
 
     def read(self, name: str) -> tuple[bytes, str] | None:
         """(bytes, content_type), or None for unknown/invalid names."""
-        m = _NAME_RE.match(name)
+        m = _NAME_RE.fullmatch(name)
         if not m:
             return None
         content_type = _CONTENT_TYPES[m.group(1)]
