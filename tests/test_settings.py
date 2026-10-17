@@ -9,7 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core import EventStore
-from strategies.models import FakeModel
+from strategies.crossroads import Crossroads
+from strategies.images import DemoImageModel
+from strategies.models import FakeModel, ScriptedModel
 from strategies.simple_passthrough import SimplePassthrough
 from server import StrategyRegistry, create_app
 from server.settings import SettingsStore, provider_of
@@ -193,3 +195,27 @@ def test_image_model_setting_roundtrip():
 def test_build_image_model_unconfigured_is_none():
     from server.settings import SettingsStore, build_image_model
     assert build_image_model(SettingsStore()) is None
+
+
+def test_missing_litellm_yields_sse_error_for_image_model():
+    """A configured image model where litellm is absent must surface a
+    readable SSE error event (and commit nothing), not a stack trace --
+    the image counterpart of test_missing_litellm_yields_sse_error."""
+    sys.modules.pop("litellm", None)
+    store = EventStore()
+    registry = StrategyRegistry()
+    registry.register(Crossroads(
+        ScriptedModel(["PASSAGE:\nP.\n\nCHOICES:\n- a\n- b\n- c"]),
+        DemoImageModel()))
+    image_client = TestClient(create_app(store, registry,
+                                         settings=SettingsStore()))
+    image_client.put("/settings", json={"image_model": "dall-e-3"})
+    root = image_client.post("/nodes", json={
+        "parent": None, "author": "user", "content": "Hi."}).json()
+    leaf = root["payload"]["node"]
+    r = image_client.post("/generate", json={
+        "leaf": leaf, "strategy": "crossroads/0.1"})
+    events = parse_sse(r.text)
+    errors = [d for k, d in events if k == "error"]
+    assert errors and "litellm" in errors[0]["message"]
+    assert not [d for k, d in events if k == "committed"]

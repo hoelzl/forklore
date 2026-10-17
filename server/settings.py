@@ -13,6 +13,9 @@ Resolution order for a generation request:
   4. None -> the strategy keeps whatever model it was constructed with
      (the demo app ships deterministic fake models, so it works offline)
 
+`image_model` is global-only: there is no per-strategy or per-request
+override chain, and strategies without `for_image_model` ignore it.
+
 Provider inference follows litellm's "provider/model" convention, with
 bare "gpt-*"/"o1-*"/"o3-*" mapping to openai and bare "claude-*" to
 anthropic. ollama and other local providers need no key.
