@@ -17,7 +17,15 @@ function imageOf(node: TNode | undefined): string | null {
   return typeof img === 'string' ? img : null
 }
 
-function Passage({ nodeId, content }: { nodeId: string; content: string }) {
+function Passage({
+  nodeId,
+  content,
+  onImageLoad,
+}: {
+  nodeId: string
+  content: string
+  onImageLoad?: () => void
+}) {
   const proj = useForklore((s) => s.proj)
   const img = imageOf(proj?.nodes[nodeId])
   return (
@@ -27,6 +35,7 @@ function Passage({ nodeId, content }: { nodeId: string; content: string }) {
           className="mb-3 w-full max-w-[40rem] border border-border"
           src={`/media/${img}`}
           alt="illustration for this passage"
+          onLoad={onImageLoad}
         />
       )}
       <p className="manuscript">{content}</p>
@@ -47,13 +56,27 @@ function ChoicePanel() {
   const leaf = leafMsg ? proj?.nodes[leafMsg.node] : undefined
   const choices = choicesOf(leaf)
 
-  const choose = (choice?: string) => {
+  if (strategy !== 'crossroads/0.1') {
+    return (
+      <div className="shrink-0 border-t border-border px-8 py-4">
+        <div className="mx-auto max-w-[70ch]">
+          <span className="hint">
+            play mode works with the crossroads/0.1 strategy — pick it in the top bar
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const choose = async (choice?: string) => {
     const params: Record<string, unknown> = {}
     if (choice?.trim()) params.choice = choice.trim()
     if (guidance.trim()) params.guidance = guidance.trim()
-    void generate(undefined, params)
-    setFreeform('')
-    setGuidance('')
+    await generate(undefined, params)
+    if (!useForklore.getState().error) {
+      setFreeform('')
+      setGuidance('')
+    }
   }
 
   return (
@@ -61,14 +84,14 @@ function ChoicePanel() {
       <div className="mx-auto max-w-[70ch] space-y-3">
         {choices.length > 0 && (
           <div className="flex flex-col gap-2">
-            {choices.map((c) => (
+            {choices.map((c, i) => (
               <Button
-                key={c}
+                key={`${i}-${c}`}
                 variant="outline"
                 size="sm"
                 className="justify-start font-serif italic"
-                disabled={streaming || strategy !== 'crossroads/0.1'}
-                onClick={() => choose(c)}
+                disabled={streaming}
+                onClick={() => void choose(c)}
               >
                 {c}
               </Button>
@@ -79,18 +102,19 @@ function ChoicePanel() {
           <input
             className="editor flex-1"
             placeholder="…or choose your own path"
+            aria-label="choose your own path"
             value={freeform}
             disabled={streaming}
             onChange={(e) => setFreeform(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && freeform.trim()) choose(freeform)
+              if (e.key === 'Enter' && freeform.trim()) void choose(freeform)
             }}
           />
           <Button
             size="sm"
             className="gap-1.5"
             disabled={streaming || !freeform.trim()}
-            onClick={() => choose(freeform)}
+            onClick={() => void choose(freeform)}
             title="generate the continuation for your choice"
           >
             <Sparkles className="size-3.5" />
@@ -169,7 +193,15 @@ export default function PlayPane() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto fl-scroll">
           <div className="mx-auto max-w-[70ch] px-8 py-8">
             {branch.map((m) => (
-              <Passage key={m.node} nodeId={m.node} content={m.content} />
+              <Passage
+                key={m.node}
+                nodeId={m.node}
+                content={m.content}
+                onImageLoad={() => {
+                  const el = scrollRef.current
+                  if (el) el.scrollTop = el.scrollHeight
+                }}
+              />
             ))}
             {streaming.active && (
               <article className="msg">
