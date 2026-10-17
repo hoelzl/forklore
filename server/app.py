@@ -19,7 +19,7 @@ from typing import Any, AsyncIterator
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from core import EventStore, GenerationMeta, InvariantError
@@ -28,6 +28,7 @@ from core.materialize import hash_messages
 from core.state import Node, TreeState
 
 from .context import StoreBranchContext
+from .media import MediaStore
 from .registry import StrategyRegistry
 from .settings import SettingsStore, build_model
 
@@ -114,9 +115,11 @@ class BranchReq(BaseModel):
 # ---------------------------------------------------------------------------
 
 def create_app(store: EventStore, registry: StrategyRegistry,
-               settings: SettingsStore | None = None) -> FastAPI:
+               settings: SettingsStore | None = None,
+               *, media: MediaStore | None = None) -> FastAPI:
     app = FastAPI(title="forklore")
     settings = settings or SettingsStore()
+    media = media or MediaStore()
 
     def guard(fn):
         try:
@@ -286,6 +289,16 @@ def create_app(store: EventStore, registry: StrategyRegistry,
     @app.get("/strategies")
     def strategies():
         return registry.list()
+
+    @app.get("/media/{name}")
+    def get_media(name: str):
+        """Serve content-addressed image bytes. Not store-touching, so a
+        plain 404 HTTPException is fine here."""
+        found = media.read(name)
+        if found is None:
+            raise HTTPException(404, f"unknown media {name!r}")
+        data, content_type = found
+        return Response(content=data, media_type=content_type)
 
     # -- settings (model/provider ergonomics) --------------------------------
 

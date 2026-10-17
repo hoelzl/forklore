@@ -2,7 +2,10 @@
 import asyncio
 
 import pytest
+from fastapi.testclient import TestClient
 
+from core import EventStore
+from server import StrategyRegistry, create_app
 from server.media import MediaStore
 from strategies.images import DemoImageModel
 
@@ -84,3 +87,19 @@ def test_unknown_name_reads_none():
 def test_trailing_newline_name_rejected():
     store = MediaStore()
     assert store.read("a" * 64 + ".svg\n") is None
+
+
+def test_media_endpoint_roundtrip():
+    media = MediaStore()
+    name = media.save(_SVG)
+    client = TestClient(create_app(EventStore(), StrategyRegistry(), media=media))
+    r = client.get(f"/media/{name}")
+    assert r.status_code == 200
+    assert r.content == _SVG
+    assert r.headers["content-type"] == "image/svg+xml"
+
+
+def test_media_endpoint_404s():
+    client = TestClient(create_app(EventStore(), StrategyRegistry()))
+    assert client.get("/media/" + "a" * 64 + ".svg").status_code == 404
+    assert client.get("/media/not-a-hash.svg").status_code == 404
