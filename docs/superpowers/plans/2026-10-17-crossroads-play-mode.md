@@ -1999,5 +1999,10 @@ git status   # should be clean; commit any verification fixes
 | Demo offline loop (DemoModel choices cycle) | 7 |
 | Play view: passages, images, choices, free-form, guidance | 12, 13 |
 | Choice provenance chip in the workbench | 13 |
-| `tests/test_core.py` untouched | (no core changes) |
+| `tests/test_core.py` untouched | (only core change: undo.py SetMeta .get() fix, semantics-preserving, tested) |
+
+**Final-review deviations accepted:** PlayPane renders no placeholder frame
+when a node has no image (spec said "placeholder frame"; landed behavior
+renders no element — judged better UX by the final reviewer; recorded here
+as the deviation note).
 | Docs updated (architecture.md, README) | 10 |
