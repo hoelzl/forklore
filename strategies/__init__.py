@@ -50,13 +50,19 @@ class BranchContext(Protocol):
 
     def plan_node(self, *, content: str, scope: str = "story",
                   author: str | None = None,
-                  meta_extra: dict[str, Any] | None = None) -> None:
+                  meta_extra: dict[str, Any] | None = None,
+                  meta: dict[str, Any] | None = None,
+                  image: bytes | None = None) -> None:
         """Declare a node to be committed under the leaf when generation
         completes. All planned nodes are committed by the server in ONE
         transaction (one undo unit), each stamped with GenerationMeta
         (strategy, model, watermark, context_hash; meta_extra merged into
-        params). scope="workspace" keeps scratch/rejected candidates out
-        of the story view but in the log.
+        params). `meta` becomes node meta via SetMeta events in the same
+        tx; `image` is saved to the media store and referenced as meta
+        "image" in the same tx. The meta key "image" is reserved for the
+        media-store reference (set from the image argument).
+        scope="workspace" keeps scratch/rejected candidates out of the
+        story view but in the log.
 
         A strategy that never calls plan_node gets the legacy behavior:
         the streamed text is committed as a single story Append."""

@@ -1,7 +1,12 @@
 """crossroads: PASSAGE:/CHOICES: parsing, choice/guidance provenance,
 one-tx commits with image SetMeta, degradation paths."""
-import pytest
+import json
 
+import pytest
+from fastapi.testclient import TestClient
+
+from core import EventStore
+from server import StrategyRegistry, create_app
 from strategies.crossroads import parse_crossroads_output
 
 
@@ -43,15 +48,6 @@ def test_empty_choice_lines_skipped():
 def test_bare_marker_choice_lines_skipped():
     text = "PASSAGE:\nP.\n\nCHOICES:\n- a\n-\n- b\n- c"
     assert parse_crossroads_output(text)[1] == ["a", "b", "c"]
-
-
-import asyncio
-import json
-
-from fastapi.testclient import TestClient
-
-from core import EventStore
-from server import StrategyRegistry, create_app
 
 
 def parse_sse(body: str):
@@ -130,3 +126,13 @@ def test_undo_reverts_node_and_image_meta():
     node = client.get("/state").json()["nodes"][node_id]
     assert node["tombstoned"]
     assert node["meta"].get("image") is None
+
+
+def test_bad_image_payload_yields_sse_error():
+    client = _stub_client([dict(content="A passage.", scope="story",
+                                image=b"\x89GIF89a not an image")])
+    events = parse_sse(client.post("/generate", json={
+        "leaf": "A", "strategy": "stub/0.1"}).text)
+    kinds = [k for k, _ in events]
+    assert "error" in kinds
+    assert "committed" not in kinds

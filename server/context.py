@@ -47,7 +47,7 @@ class StoreBranchContext:
         (the server commits all planned nodes in one transaction).
         `meta` becomes node meta via SetMeta events in the same tx;
         `image` is saved to the media store and referenced as meta
-        "image" in the same tx."""
+        "image" in the same tx. Note: the meta key "image" is reserved for the media-store reference (set from the image argument)."""
         self.planned.append({
             "content": content, "scope": scope,
             "author": author, "meta_extra": meta_extra or {},
