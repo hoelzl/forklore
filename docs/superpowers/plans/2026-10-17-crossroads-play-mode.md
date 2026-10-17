@@ -176,7 +176,7 @@ def parse_crossroads_output(text: str) -> tuple[str, list[str]]:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_crossroads.py -v`
-Expected: 6 passed
+Expected: 7 passed
 
 - [ ] **Step 5: Commit**
 
@@ -560,7 +560,7 @@ Run: `python -m pytest tests/test_media.py -v`
 Expected: 12 passed
 
 Run the full suite to confirm nothing broke: `python -m pytest`
-Expected: all pass (114 total: 96 existing + 18 new)
+Expected: all pass (115 total: 96 existing + 19 new)
 
 - [ ] **Step 5: Commit**
 
@@ -736,7 +736,7 @@ Replace the planned-commit block (lines 379-396, the `if ctx.planned:` branch) w
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_crossroads.py -v`
-Expected: 9 passed
+Expected: 10 passed
 
 Run the full suite (best_of_n / beat_planner exercise the old plan_node path):
 `python -m pytest`
@@ -950,7 +950,7 @@ In `strategies/models.py`:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_crossroads.py -v`
-Expected: 12 passed
+Expected: 13 passed
 
 Full suite: `python -m pytest` — all pass (crew/best_of_n demo cycles untouched)
 
@@ -1013,7 +1013,8 @@ def test_turn_commits_passage_choices_and_image(client):
                                  "Take the stairs"]
     assert params["choice"] == "Open it"
     assert params["guidance"] == "keep it quiet"
-    assert params["image_prompt"].startswith("Illustration for a story passage:")
+    assert params["image_prompt"].startswith("She stepped inside")
+    assert params["image_prompt"].endswith("— illustration for a story passage")
     # image committed in the same tx, referenced from node meta
     meta_events = [e for e in committed if e["kind"] == "set_meta"
                    and e["payload"]["key"] == "image"]
@@ -1173,8 +1174,9 @@ class Crossroads:
             # the raw reply (which would carry the markers into the story)
             passage = raw.partition("CHOICES:")[0].removeprefix("PASSAGE:").strip()
 
-        image_prompt = ("Illustration for a story passage: "
-                        + " ".join(passage.split()[:40]))
+        # excerpt first, so the demo plate's title word is passage-specific
+        image_prompt = (" ".join(passage.split()[:40])
+                        + " — illustration for a story passage")
         image = None
         try:
             image = await self.image_model.generate(image_prompt, params)
@@ -1197,7 +1199,7 @@ class Crossroads:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_crossroads.py -v`
-Expected: 18 passed
+Expected: 19 passed
 
 Full suite: `python -m pytest` — all pass
 
@@ -1852,7 +1854,7 @@ git commit -m "web: play/workbench toggle; /media dev proxy; choice provenance c
 - [ ] **Step 1: Full backend suite**
 
 Run: `python -m pytest`
-Expected: all pass (133 total: 96 original + 18 crossroads + 12 media +
+Expected: all pass (134 total: 96 original + 19 crossroads + 12 media +
 5 steering + 2 image settings)
 
 - [ ] **Step 2: Full frontend checks**
