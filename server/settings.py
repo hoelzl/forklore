@@ -29,6 +29,7 @@ _KEYLESS_PROVIDERS = {"ollama", "ollama_chat", "lm_studio", "vllm",
 
 _DEFAULTS: dict[str, Any] = {
     "default_model": None,
+    "image_model": None,     # litellm image model for generated-node art
     "api_keys": {},          # provider -> secret
     "strategy_models": {},   # strategy id -> litellm model string
     "default_params": {},    # temperature, max_tokens, ... merged into calls
@@ -84,6 +85,8 @@ class SettingsStore:
                             self._data[key][k] = v
             if "default_model" in patch:
                 self._data["default_model"] = patch["default_model"] or None
+            if "image_model" in patch:
+                self._data["image_model"] = patch["image_model"] or None
             if self.path:
                 tmp = self.path + ".tmp"
                 with open(tmp, "w", encoding="utf-8") as f:
@@ -140,4 +143,24 @@ def build_model(model: str, settings: SettingsStore):
     except ImportError:
         raise RuntimeError(
             f"model {model!r} requires litellm "
+            f"(pip install litellm), which is not installed here")
+
+
+def build_image_model(settings: SettingsStore):
+    """Instantiate the configured image model, or None when unconfigured
+    (strategies then keep their built-in demo image model). Raises
+    RuntimeError with a clear message when litellm is absent."""
+    model = settings.get()["image_model"]
+    if not model:
+        return None
+    try:
+        from strategies.images import LiteLLMImageModel
+        kwargs: dict[str, Any] = {}
+        key = settings.api_key_for(model)
+        if key:
+            kwargs["api_key"] = key
+        return LiteLLMImageModel(model, **kwargs)
+    except ImportError:
+        raise RuntimeError(
+            f"image model {model!r} requires litellm "
             f"(pip install litellm), which is not installed here")

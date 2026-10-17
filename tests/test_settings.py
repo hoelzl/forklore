@@ -176,3 +176,20 @@ def test_demo_model_when_nothing_configured(client):
         "strategy": "simple_passthrough/0.1"})
     tokens = "".join(d["delta"] for k, d in parse_sse(r.text) if k == "token")
     assert tokens == "plain demo reply"
+
+
+# -- image model ------------------------------------------------------------
+
+def test_image_model_setting_roundtrip():
+    from server.settings import SettingsStore
+    s = SettingsStore()
+    assert s.redacted()["image_model"] is None
+    s.update({"image_model": "dall-e-3"})
+    assert s.redacted()["image_model"] == "dall-e-3"
+    s.update({"image_model": ""})  # empty string clears
+    assert s.redacted()["image_model"] is None
+
+
+def test_build_image_model_unconfigured_is_none():
+    from server.settings import SettingsStore, build_image_model
+    assert build_image_model(SettingsStore()) is None

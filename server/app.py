@@ -30,7 +30,7 @@ from core.state import Node, TreeState
 from .context import StoreBranchContext
 from .media import MediaStore
 from .registry import StrategyRegistry
-from .settings import SettingsStore, build_model
+from .settings import SettingsStore, build_image_model, build_model
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ def create_app(store: EventStore, registry: StrategyRegistry,
 
     @app.put("/settings")
     def put_settings(patch: dict[str, Any]):
-        unknown = set(patch) - {"default_model", "api_keys",
+        unknown = set(patch) - {"default_model", "image_model", "api_keys",
                                 "strategy_models", "default_params"}
         if unknown:
             raise HTTPException(422, f"unknown settings keys: {sorted(unknown)}")
@@ -375,6 +375,19 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                 async def failed() -> AsyncIterator[str]:
                     yield sse("error", {"message": message})
                 return StreamingResponse(failed(),
+                                         media_type="text/event-stream")
+
+        if hasattr(strategy, "for_image_model"):
+            try:
+                image_model = build_image_model(settings)
+                if image_model:
+                    strategy = strategy.for_image_model(image_model)
+            except RuntimeError as e:
+                message = str(e)  # `e` is cleared after the except block
+
+                async def failed_image() -> AsyncIterator[str]:
+                    yield sse("error", {"message": message})
+                return StreamingResponse(failed_image(),
                                          media_type="text/event-stream")
 
         async def stream() -> AsyncIterator[str]:
