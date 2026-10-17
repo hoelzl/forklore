@@ -1083,6 +1083,27 @@ def test_image_failure_still_commits_the_node():
     kinds = [e["kind"] for e in committed]
     assert kinds == ["append"]  # no image SetMeta
     assert committed[0]["payload"]["content"].startswith("She stepped inside")
+    params = committed[0]["payload"]["meta"]["params"]
+    assert params["image_error"] == "provider down"
+
+
+def test_empty_passage_yields_sse_error():
+    store = EventStore()
+    store.append_node(None, "you", "The door was open.", node_id="A")
+    registry = StrategyRegistry()
+    registry.register(Crossroads(
+        ScriptedModel(["PASSAGE:
+
+CHOICES:
+- a
+- b
+- c"]),
+        DemoImageModel()))
+    client = TestClient(create_app(store, registry))
+    events = _generate(client)
+    kinds = [k for k, _ in events]
+    assert "error" in kinds
+    assert "committed" not in kinds
 
 
 def test_guidance_in_prompt_but_never_in_story():
@@ -1189,36 +1210,43 @@ class Crossroads:
         raw = await collect(self.model.stream(prompt, {}))
         passage, choices = parse_crossroads_output(raw)
         if not passage:
-            # empty passage: fall back to the pre-CHOICES body, never to
-            # the raw reply (which would carry the markers into the story)
-            passage = raw.partition("CHOICES:")[0].removeprefix("PASSAGE:").strip()
+            # empty passage: fall back to the stripped pre-CHOICES body,
+            # never to the raw reply (markers must not enter the story)
+            passage = (raw.strip().partition("CHOICES:")[0]
+                       .removeprefix("PASSAGE:").strip())
+        if not passage:
+            raise RuntimeError("crossroads: the model produced no passage")
+
+        words = passage.split(" ")
+        for i, w in enumerate(words):
+            yield w if i == len(words) - 1 else w + " "
 
         # excerpt first, so the demo plate's title word is passage-specific
         image_prompt = (" ".join(passage.split()[:40])
                         + " — illustration for a story passage")
         image = None
+        image_error = None
         try:
-            image = await self.image_model.generate(image_prompt, params)
-        except Exception:
-            image = None  # the story is primary; the picture is decoration
+            # params are NOT forwarded: routing keys (choice/guidance/
+            # author) would leak into provider kwargs
+            image = await self.image_model.generate(image_prompt, {})
+        except Exception as e:
+            image_error = str(e)  # the story is primary; the picture is decoration
 
         ctx.plan_node(
             content=passage, scope="story", author=author,
             meta_extra={"choices": choices,
                         "choice": choice or None,
                         "guidance": guidance or None,
-                        "image_prompt": image_prompt},
+                        "image_prompt": image_prompt,
+                        "image_error": image_error},
             image=image)
-
-        words = passage.split(" ")
-        for i, w in enumerate(words):
-            yield w if i == len(words) - 1 else w + " "
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_crossroads.py -v`
-Expected: 19 passed
+Expected: 21 passed
 
 Full suite: `python -m pytest` — all pass
 
@@ -1873,7 +1901,7 @@ git commit -m "web: play/workbench toggle; /media dev proxy; choice provenance c
 - [ ] **Step 1: Full backend suite**
 
 Run: `python -m pytest`
-Expected: all pass (134 total: 96 original + 19 crossroads + 12 media +
+Expected: all pass (137 total: 96 original + 21 crossroads + 13 media +
 5 steering + 2 image settings)
 
 - [ ] **Step 2: Full frontend checks**
