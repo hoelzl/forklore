@@ -33,3 +33,50 @@ def test_demo_image_varies_with_prompt():
 def test_demo_image_metadata():
     assert DemoImageModel.ext == "svg"
     assert DemoImageModel.name
+
+
+from server.media import MediaStore
+
+_SVG = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+def test_save_and_read_roundtrip_memory():
+    store = MediaStore()
+    name = store.save(_SVG)
+    assert name.endswith(".svg")
+    data, content_type = store.read(name)
+    assert data == _SVG
+    assert content_type == "image/svg+xml"
+
+
+def test_save_and_read_roundtrip_disk(tmp_path):
+    store = MediaStore(str(tmp_path))
+    name = store.save(_PNG)
+    assert name.endswith(".png")
+    assert (tmp_path / name).read_bytes() == _PNG
+    data, content_type = MediaStore(str(tmp_path)).read(name)
+    assert data == _PNG
+    assert content_type == "image/png"
+
+
+def test_save_is_content_addressed():
+    store = MediaStore()
+    assert store.save(_SVG) == store.save(_SVG)
+
+
+def test_unsupported_payload_rejected():
+    with pytest.raises(ValueError):
+        MediaStore().save(b"not an image")
+
+
+def test_traversal_and_bad_names_rejected():
+    store = MediaStore()
+    for bad in ("../etc/passwd", "a/b.svg", "ABC.svg", "x" * 64 + ".svg",
+                "x" * 64 + ".gif", ""):
+        assert store.read(bad) is None
+
+
+def test_unknown_name_reads_none():
+    store = MediaStore()
+    assert store.read("a" * 64 + ".svg") is None
