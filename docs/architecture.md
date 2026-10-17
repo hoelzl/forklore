@@ -91,7 +91,11 @@ Current strategies: `simple_passthrough/0.1` (baseline),
 `best_of_n/0.1` (parallel sampling + critic scoring),
 `langgraph_crew/0.1` (sequential pipeline with a revision loop),
 `beat_planner/0.1` (hierarchical plan-then-execute; the roadmap is a
-workspace node, progress is derived from the tree, not strategy memory).
+workspace node, progress is derived from the tree, not strategy memory),
+`crossroads/0.1` (choice-driven play: one passage + three choices per
+turn, a `guide` meta-role instruction turn carrying the reader's choice
+and one-shot hidden guidance, and a per-node generated image committed
+as node meta in the same transaction).
 
 ## Server conventions (`server/`)
 

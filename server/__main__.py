@@ -15,11 +15,14 @@ import importlib.util
 from core import EventStore
 from strategies.beat_planner import BeatPlanner
 from strategies.best_of_n import BestOfN
+from strategies.crossroads import Crossroads
+from strategies.images import DemoImageModel
 from strategies.models import DemoModel, FakeModel
 from strategies.simple_passthrough import SimplePassthrough
 
 from .app import create_app
 from .demo import seed_demo
+from .media import MediaStore
 from .registry import StrategyRegistry
 from .settings import SettingsStore
 
@@ -38,6 +41,7 @@ registry.register(SimplePassthrough(FakeModel(
           "\"{last}\" lingered in the air a moment longer than it should have.")))
 registry.register(BestOfN(DemoModel()))
 registry.register(BeatPlanner(DemoModel()))
+registry.register(Crossroads(DemoModel(), DemoImageModel()))
 
 if importlib.util.find_spec("langgraph") is not None:
     from strategies.langgraph_crew import LangGraphCrew
@@ -46,7 +50,8 @@ else:
     print("note: langgraph not installed — langgraph_crew unavailable "
           "(pip install langgraph to enable)")
 
-app = create_app(store, registry, settings)
+_media_path = (_db_path + ".media") if _db_path else "forklore.media"
+app = create_app(store, registry, settings, media=MediaStore(_media_path))
 
 if importlib.util.find_spec("litellm") is None:
     print("note: litellm not installed — settings can store a model, but "

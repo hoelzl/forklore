@@ -46,6 +46,9 @@ reproducibility.
   revision loop (LangGraph); every artifact persisted to the workspace.
 - `beat_planner/0.1` — plans the next k beats as a workspace roadmap, then
   drafts one beat per generation; progress is derived from the tree.
+- `crossroads/0.1` — choice-driven play: a passage plus three choices per
+  turn, a free-form choice, a hidden one-shot guidance box, and a
+  generated image per node (demo image model works offline).
 
 See [docs/architecture.md](docs/architecture.md) for the strategy-authoring
 contract and the load-bearing invariants.
