@@ -98,6 +98,14 @@ function MessageItem({
             score {String(node.generation.params.score)}
           </span>
         )}
+        {node.generation?.params?.beat !== undefined && (
+          <span
+            className="chip"
+            title={`roadmap beat: ${String(node.generation.params.beat_text ?? '')}`}
+          >
+            beat {String(node.generation.params.beat)} of {String(node.generation.params.of)}
+          </span>
+        )}
         {node.generation?.params?.rounds !== undefined && (
           <span
             className="chip"

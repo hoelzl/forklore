@@ -262,12 +262,22 @@ def create_app(store: EventStore, registry: StrategyRegistry,
         s = store.state(at)
         if node not in s.nodes:
             raise HTTPException(404, f"unknown node {node!r}")
-        tx = s.nodes[node].tx
-        artifacts = sorted(
-            (n for n in s.nodes.values()
-             if n.tx == tx and n.scope == "workspace" and n.id != node),
-            key=lambda n: n.created_seq)
-        return {"tx": tx, "artifacts": [node_dict(n) for n in artifacts]}
+        src = s.nodes[node]
+        artifacts = [n for n in s.nodes.values()
+                     if n.tx == src.tx and n.scope == "workspace"
+                     and n.id != node]
+        plan_id = (src.generation.params.get("plan_id")
+                   if src.generation else None)
+        if plan_id and all((n.generation.params.get("plan_id") != plan_id
+                            if n.generation else True) for n in artifacts):
+            plan = next((n for n in s.nodes.values()
+                         if n.scope == "workspace" and n.generation
+                         and n.generation.params.get("plan_id") == plan_id
+                         and not s.is_hidden(n.id)), None)
+            if plan:
+                artifacts.append(plan)
+        artifacts.sort(key=lambda n: n.created_seq)
+        return {"tx": src.tx, "artifacts": [node_dict(n) for n in artifacts]}
 
     @app.get("/events")
     def events(after: int = 0):

@@ -83,6 +83,14 @@ class DemoModel:
             "not ask aloud.",
             "Give the lighthouse a want of its own, and let Mara feel it.",
         ])
+        self._beat_sheets = itertools.cycle([
+            "1. Mara finds the log's last entry is dated tomorrow.\n"
+            "2. The blue flame answers in the last keeper's voice.\n"
+            "3. She douses the lamp herself — and the fog answers.",
+            "1. The stairs continue past the lamp room, down into rock.\n"
+            "2. Below: a second light, burning blue, and a chair still warm.\n"
+            "3. The chair's occupant returns — wearing Mara's face.",
+        ])
         self.name = name
 
     async def stream(self, messages: list[Message],
@@ -92,6 +100,8 @@ class DemoModel:
             text = next(self._verdicts)
         elif last == "director":
             text = next(self._directions)
+        elif last == "planner":
+            text = next(self._beat_sheets)
         else:
             text = next(self._replies)
         words = text.split(" ")
@@ -119,7 +129,8 @@ class LiteLLMModel:
         best on chat APIs."""
         if author == "system":
             return "system"
-        if author in ("you", "user", "director", "critic", "drafter"):
+        if author in ("you", "user", "director", "critic", "drafter",
+                      "planner"):
             return "user"
         return "assistant"
 

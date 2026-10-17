@@ -13,6 +13,7 @@ import uvicorn
 import importlib.util
 
 from core import EventStore
+from strategies.beat_planner import BeatPlanner
 from strategies.best_of_n import BestOfN
 from strategies.models import DemoModel, FakeModel
 from strategies.simple_passthrough import SimplePassthrough
@@ -36,6 +37,7 @@ registry.register(SimplePassthrough(FakeModel(
     reply="The thread of the story picks itself up and carries on — "
           "\"{last}\" lingered in the air a moment longer than it should have.")))
 registry.register(BestOfN(DemoModel()))
+registry.register(BeatPlanner(DemoModel()))
 
 if importlib.util.find_spec("langgraph") is not None:
     from strategies.langgraph_crew import LangGraphCrew
