@@ -1566,6 +1566,11 @@ In `web/src/lib/store.ts`, `ForkloreState` interface:
 Run: `cd web && npm run build`
 Expected: builds clean (existing callers `generate()` / `generate(parent)` still typecheck)
 
+(Lint note: `npm run lint` has 13 pre-existing errors at the branch
+base — react-refresh/react-hooks rules in untouched files plus two
+`no-explicit-any`. The bar for frontend tasks is "no NEW lint errors";
+fixing the baseline is out of scope.)
+
 - [ ] **Step 4: Commit**
 
 ```bash
@@ -1907,7 +1912,7 @@ Expected: all pass (137 total: 96 original + 21 crossroads + 13 media +
 - [ ] **Step 2: Full frontend checks**
 
 Run: `cd web && npm run build && npm run lint`
-Expected: both pass
+Expected: build passes; lint shows only the 13 pre-existing errors
 
 - [ ] **Step 3: Live smoke test with the demo models**
 
