@@ -68,6 +68,11 @@ class BranchContext(Protocol):
         the streamed text is committed as a single story Append."""
         ...
 
+    def steering(self) -> list[Message]:
+        """Steering briefs (kind="steering" meta) on the branch path,
+        root -> leaf, pin-resolved. Empty when the branch has none."""
+        ...
+
 
 class GenerationStrategy(Protocol):
     id: str                 # registry id, e.g. "simple_passthrough/0.1"

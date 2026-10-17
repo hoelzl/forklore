@@ -14,14 +14,18 @@ def store():
     s.append_node("A", "you", "Tone: gothic, quiet, exact.",
                   node_id="S", scope="workspace")
     s.set_meta("S", "kind", "steering")
-    s.append_node("S", "character", "She stepped inside.", node_id="B")
+    s.append_node("S", "you", "POV: second person, present tense.",
+                  node_id="S2", scope="workspace")
+    s.set_meta("S2", "kind", "steering")
+    s.append_node("S2", "character", "She stepped inside.", node_id="B")
     return s
 
 
 def test_steering_returns_briefs_root_to_leaf(store):
     briefs = StoreBranchContext(store, "B").steering()
-    assert [m.node for m in briefs] == ["S"]
+    assert [m.node for m in briefs] == ["S", "S2"]
     assert briefs[0].content == "Tone: gothic, quiet, exact."
+    assert briefs[1].content == "POV: second person, present tense."
 
 
 def test_steering_empty_when_absent(store):
@@ -42,8 +46,10 @@ def test_steering_sees_revised_version(store):
 
 
 def test_steering_respects_pins(store):
-    store.revise("S", "Tone: bright, wry, fast.")
-    store.pin("S", "B", 1)
+    store.revise("S2", "POV: third person, past tense.")
+    store.pin("S2", "B", 1)
     briefs = StoreBranchContext(store, "B").steering()
     assert briefs[0].content == "Tone: gothic, quiet, exact."
-    assert briefs[0].pinned
+    assert not briefs[0].pinned
+    assert briefs[1].content == "POV: second person, present tense."
+    assert briefs[1].pinned
