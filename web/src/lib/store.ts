@@ -85,6 +85,7 @@ interface ForkloreState {
   workshop: { nodeId: string; tx: string; artifacts: TNode[] } | null
   branches: BranchInfo[]
   compare: { a: string; b: string } | null
+  play: boolean
   settings: Settings | null
   error: string | null
   initialized: boolean
@@ -94,7 +95,7 @@ interface ForkloreState {
   setCursor: (id: string) => Promise<void>
   swipe: (index: number, dir: -1 | 1) => Promise<void>
   writeMessage: (content: string) => Promise<void>
-  generate: (leaf?: string) => Promise<void>
+  generate: (leaf?: string, params?: Record<string, unknown>) => Promise<void>
   regenerate: (nodeId: string) => Promise<void>
   reviseAll: (nodeId: string, content: string) => Promise<void>
   divergeHere: (index: number, content: string) => Promise<void>
@@ -113,6 +114,7 @@ interface ForkloreState {
   unnameBranch: (name: string) => Promise<void>
   pruneBranch: (name: string) => Promise<void>
   setCompare: (c: { a: string; b: string } | null) => void
+  setPlay: (on: boolean) => void
 }
 
 let eventsource: EventSource | null = null
@@ -140,6 +142,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     workshop: null,
     branches: [],
     compare: null,
+    play: false,
     settings: null,
     error: null,
     initialized: false,
@@ -218,7 +221,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
       }
     },
 
-    async generate(leaf) {
+    async generate(leaf, params) {
       const { cursor, strategy, streaming } = get()
       const target = leaf ?? cursor
       if (!target || !strategy || streaming.active) return
@@ -229,6 +232,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
           leaf: target,
           strategy,
           author: 'character',
+          ...(params && Object.keys(params).length ? { params } : {}),
         })) {
           if (ev.event === 'token') {
             set((s) => ({
@@ -398,6 +402,7 @@ export const useForklore = create<ForkloreState>()((set, get) => {
     },
 
     setCompare: (c) => set({ compare: c }),
+    setPlay: (on) => set((s) => ({ play: on, compare: on ? null : s.compare })),
   }
 })
 

@@ -65,9 +65,12 @@ async def generate(self, ctx, params) -> AsyncIterator[str]: ...
   `ctx.record_prompt(base)` with the *exact* prompt messages so
   `context_hash` covers whatever your truncation/assembly actually kept.
 - **Declare results** with `ctx.plan_node(content=..., scope=...,
-  meta_extra=...)`. The server commits ALL planned nodes in one transaction,
-  stamped with GenerationMeta (`meta_extra` lands in `params`). A strategy
-  that plans nothing falls back to the legacy single-append contract.
+  meta_extra=..., meta=..., image=...)`. The server commits ALL planned
+  nodes in one transaction, stamped with GenerationMeta (`meta_extra` lands
+  in `params`); `meta` becomes node meta and `image` is saved to the media
+  store and referenced as meta `"image"`, both via SetMeta events in the
+  same tx. A strategy that plans nothing falls back to the legacy
+  single-append contract.
 - **Stream** the user-facing text by yielding tokens. Usually the collected
   winner re-streamed word-by-word, so the UI feels live.
 - **Model access** is always `self.model.stream(messages, params)` — an
@@ -88,7 +91,11 @@ Current strategies: `simple_passthrough/0.1` (baseline),
 `best_of_n/0.1` (parallel sampling + critic scoring),
 `langgraph_crew/0.1` (sequential pipeline with a revision loop),
 `beat_planner/0.1` (hierarchical plan-then-execute; the roadmap is a
-workspace node, progress is derived from the tree, not strategy memory).
+workspace node, progress is derived from the tree, not strategy memory),
+`crossroads/0.1` (choice-driven play: one passage + three choices per
+turn, a `guide` meta-role instruction turn carrying the reader's choice
+and one-shot hidden guidance, and a per-node generated image committed
+as node meta in the same transaction).
 
 ## Server conventions (`server/`)
 
@@ -144,6 +151,9 @@ workspace node, progress is derived from the tree, not strategy memory).
   `str(e)` in a local before defining a closure that reports it.
 - SQLite under FastAPI: `check_same_thread=False` + a lock around commit.
 - SSE follow loops must have a `follow` escape for tests, or pytest hangs.
+- `core/undo.py` SetMeta compensation: use `pre.nodes.get(p.node)` — the
+  node may have been created in the same tx (planned commit + SetMeta),
+  and direct indexing crashes undo with KeyError.
 
 ## Dev workflow
 

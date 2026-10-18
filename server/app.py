@@ -19,7 +19,7 @@ from typing import Any, AsyncIterator
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from core import EventStore, GenerationMeta, InvariantError
@@ -28,8 +28,9 @@ from core.materialize import hash_messages
 from core.state import Node, TreeState
 
 from .context import StoreBranchContext
+from .media import MediaStore
 from .registry import StrategyRegistry
-from .settings import SettingsStore, build_model
+from .settings import SettingsStore, build_image_model, build_model
 
 
 # ---------------------------------------------------------------------------
@@ -114,9 +115,11 @@ class BranchReq(BaseModel):
 # ---------------------------------------------------------------------------
 
 def create_app(store: EventStore, registry: StrategyRegistry,
-               settings: SettingsStore | None = None) -> FastAPI:
+               settings: SettingsStore | None = None,
+               *, media: MediaStore | None = None) -> FastAPI:
     app = FastAPI(title="forklore")
     settings = settings or SettingsStore()
+    media = media or MediaStore()
 
     def guard(fn):
         try:
@@ -287,6 +290,16 @@ def create_app(store: EventStore, registry: StrategyRegistry,
     def strategies():
         return registry.list()
 
+    @app.get("/media/{name}")
+    def get_media(name: str):
+        """Serve content-addressed image bytes. Not store-touching, so a
+        plain 404 HTTPException is fine here."""
+        found = media.read(name)
+        if found is None:
+            raise HTTPException(404, f"unknown media {name!r}")
+        data, content_type = found
+        return Response(content=data, media_type=content_type)
+
     # -- settings (model/provider ergonomics) --------------------------------
 
     @app.get("/settings")
@@ -298,7 +311,7 @@ def create_app(store: EventStore, registry: StrategyRegistry,
 
     @app.put("/settings")
     def put_settings(patch: dict[str, Any]):
-        unknown = set(patch) - {"default_model", "api_keys",
+        unknown = set(patch) - {"default_model", "image_model", "api_keys",
                                 "strategy_models", "default_params"}
         if unknown:
             raise HTTPException(422, f"unknown settings keys: {sorted(unknown)}")
@@ -364,6 +377,19 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                 return StreamingResponse(failed(),
                                          media_type="text/event-stream")
 
+        if hasattr(strategy, "for_image_model"):
+            try:
+                image_model = build_image_model(settings)
+                if image_model:
+                    strategy = strategy.for_image_model(image_model)
+            except RuntimeError as e:
+                message = str(e)  # `e` is cleared after the except block
+
+                async def failed_image() -> AsyncIterator[str]:
+                    yield sse("error", {"message": message})
+                return StreamingResponse(failed_image(),
+                                         media_type="text/event-stream")
+
         async def stream() -> AsyncIterator[str]:
             buf: list[str] = []
             try:
@@ -377,10 +403,14 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                 ctx_hash = hash_messages(prompt)
 
                 if ctx.planned:
-                    # strategy declared its nodes: commit all in ONE tx
-                    planned_events = [
-                        E.Append(payload=E.AppendPayload(
-                            node=uuid4().hex, parent=req.leaf,
+                    # strategy declared its nodes: commit all in ONE tx,
+                    # with declared node meta and image refs as SetMeta
+                    # events in the same transaction
+                    planned_events: list = []
+                    for p in ctx.planned:
+                        node_id = uuid4().hex
+                        planned_events.append(E.Append(payload=E.AppendPayload(
+                            node=node_id, parent=req.leaf,
                             author=p["author"] or req.author,
                             content=p["content"], scope=p["scope"],
                             meta=GenerationMeta(
@@ -389,9 +419,16 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                                               "unknown"),
                                 params={**req.params, **p["meta_extra"]},
                                 watermark=ctx.watermark,
-                                context_hash=ctx_hash)))
-                        for p in ctx.planned
-                    ]
+                                context_hash=ctx_hash))))
+                        for key, value in p["meta"].items():
+                            planned_events.append(E.SetMeta(
+                                payload=E.SetMetaPayload(
+                                    node=node_id, key=key, value=value)))
+                        if p["image"] is not None:
+                            planned_events.append(E.SetMeta(
+                                payload=E.SetMetaPayload(
+                                    node=node_id, key="image",
+                                    value=media.save(p["image"]))))
                     committed = store.commit(
                         planned_events, actor=f"strategy:{strategy.id}")
                 else:
@@ -407,7 +444,8 @@ def create_app(store: EventStore, registry: StrategyRegistry,
                         actor=f"strategy:{strategy.id}")]
 
                 story_events = [e for e in committed
-                                if e.payload.scope == "story"]
+                                if isinstance(e, E.Append)
+                                and e.payload.scope == "story"]
                 yield sse("committed", {
                     "events": [event_dict(e) for e in committed],
                     # backward compat: the first story append

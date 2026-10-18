@@ -3,6 +3,7 @@ import TopBar from '@/components/TopBar'
 import TreePane from '@/components/TreePane'
 import ChatPane from '@/components/ChatPane'
 import ComparePane from '@/components/ComparePane'
+import PlayPane from '@/components/PlayPane'
 import { useForklore } from '@/lib/store'
 
 export default function App() {
@@ -10,6 +11,7 @@ export default function App() {
   const error = useForklore((s) => s.error)
   const clearError = useForklore((s) => s.clearError)
   const comparing = useForklore((s) => s.compare !== null)
+  const play = useForklore((s) => s.play)
 
   useEffect(() => {
     void init()
@@ -22,7 +24,7 @@ export default function App() {
         <div className="hidden md:flex min-h-0 flex-col">
           <TreePane />
         </div>
-        {comparing ? <ComparePane /> : <ChatPane />}
+        {comparing ? <ComparePane /> : play ? <PlayPane /> : <ChatPane />}
       </div>
       {error && (
         <div

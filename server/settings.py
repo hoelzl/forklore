@@ -13,9 +13,12 @@ Resolution order for a generation request:
   4. None -> the strategy keeps whatever model it was constructed with
      (the demo app ships deterministic fake models, so it works offline)
 
+`image_model` is global-only: there is no per-strategy or per-request
+override chain, and strategies without `for_image_model` ignore it.
+
 Provider inference follows litellm's "provider/model" convention, with
-bare "gpt-*"/"o1-*"/"o3-*" mapping to openai and bare "claude-*" to
-anthropic. ollama and other local providers need no key.
+bare "gpt-*"/"o1-*"/"o3-*"/"dall-e-*" mapping to openai and bare
+"claude-*" to anthropic. ollama and other local providers need no key.
 """
 from __future__ import annotations
 
@@ -29,6 +32,7 @@ _KEYLESS_PROVIDERS = {"ollama", "ollama_chat", "lm_studio", "vllm",
 
 _DEFAULTS: dict[str, Any] = {
     "default_model": None,
+    "image_model": None,     # litellm image model for generated-node art
     "api_keys": {},          # provider -> secret
     "strategy_models": {},   # strategy id -> litellm model string
     "default_params": {},    # temperature, max_tokens, ... merged into calls
@@ -84,6 +88,8 @@ class SettingsStore:
                             self._data[key][k] = v
             if "default_model" in patch:
                 self._data["default_model"] = patch["default_model"] or None
+            if "image_model" in patch:
+                self._data["image_model"] = patch["image_model"] or None
             if self.path:
                 tmp = self.path + ".tmp"
                 with open(tmp, "w", encoding="utf-8") as f:
@@ -119,7 +125,8 @@ def provider_of(model: str) -> str | None:
     if "/" in model:
         return model.split("/", 1)[0].lower()
     low = model.lower()
-    if low.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-")):
+    if low.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-",
+                       "dall-e-", "gpt-image-")):
         return "openai"
     if low.startswith("claude"):
         return "anthropic"
@@ -140,4 +147,24 @@ def build_model(model: str, settings: SettingsStore):
     except ImportError:
         raise RuntimeError(
             f"model {model!r} requires litellm "
+            f"(pip install litellm), which is not installed here")
+
+
+def build_image_model(settings: SettingsStore):
+    """Instantiate the configured image model, or None when unconfigured
+    (strategies then keep their built-in demo image model). Raises
+    RuntimeError with a clear message when litellm is absent."""
+    model = settings.get()["image_model"]
+    if not model:
+        return None
+    try:
+        from strategies.images import LiteLLMImageModel
+        kwargs: dict[str, Any] = {}
+        key = settings.api_key_for(model)
+        if key:
+            kwargs["api_key"] = key
+        return LiteLLMImageModel(model, **kwargs)
+    except ImportError:
+        raise RuntimeError(
+            f"image model {model!r} requires litellm "
             f"(pip install litellm), which is not installed here")
